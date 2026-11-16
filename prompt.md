@@ -54,4 +54,6 @@ A chaque fois qu'un fichier CSV est choisi,
 Cet écran propose un tableau qui liste toutes les applications et pour chaque cluster met une icone:
 - une icone validation verte indique que l'application a un namespace dans ce cluster et au survol de l'icone, une liste des namespaces apparaît en popup
 - une icone absence rouge indique que l'application n'a pas de namespace dans ce cluster
-Un filtre permet d'exclure les 00000.
+Un filtre permet d'exclure les applications dont le code ne contient que des 0.
+Un bouton d'export permet de générer un fichier csv avec 1 seule colonne :
+- code_app et en valeur les codes applications affichés (filtrés)
