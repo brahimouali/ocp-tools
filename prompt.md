@@ -29,6 +29,7 @@ Index ElasticSearch pour le stockage des fichier YAML.
 
 # Ecrans
 Chaque écran est une entrée du menu principal.
+Toute la largeur de la page est utilisée.
 
 ## Gestion des environnements
 Un écran permet de gérer les environnements et les clusters.
@@ -47,3 +48,4 @@ A chaque fois qu'un fichier CSV est choisi,
 - le tableau affiche :
   - le nom du namespace
   - le code application du namespace contenu dans le nom (code entre 4 et 6 chiffres représentant le code application de l'application)
+  - si le code application n'est pas reconnu, alors le code 00000 est utilisé
