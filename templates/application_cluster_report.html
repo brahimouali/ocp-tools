@@ -4,11 +4,16 @@
   <h2>Rapport application/cluster</h2>
   <form method="get">
     <label class="report-filter"><input type="checkbox" name="exclude_unknown" value="1" {% if exclude_unknown %}checked{% endif %}>Exclure les codes application composés uniquement de zéros</label>
+    <label><span id="cluster-filter-label">Cluster</span><select name="cluster_id" aria-labelledby="cluster-filter-label">
+      <option value="">Tous les clusters</option>
+      {% for c in clusters %}<option value="{{ c.id }}" {% if selected_cluster == c.id %}selected{% endif %}>{{ c.environment_title }} — {{ c.title }}</option>{% endfor %}
+    </select></label>
     <button>Appliquer le filtre</button>
   </form>
   <form method="get" class="report-export">
     <input type="hidden" name="export" value="csv">
     {% if exclude_unknown %}<input type="hidden" name="exclude_unknown" value="1">{% endif %}
+    {% if selected_cluster is not none %}<input type="hidden" name="cluster_id" value="{{ selected_cluster }}">{% endif %}
     <button>Exporter en CSV</button>
   </form>
   <p>✓ Présente · ✕ Absente. Survolez une présence ou sélectionnez-la pour afficher ses namespaces.</p>
@@ -24,7 +29,7 @@
         <div id="namespaces-{{ a.id }}-{{ c.id }}" class="namespace-popup" popover="manual" role="tooltip"><strong>Namespaces — {{ a.code }} / {{ c.title }}</strong><ul>{% for name in names %}<li>{{ name }}</li>{% endfor %}</ul></div>
         {% else %}<span class="presence-status absent" role="img" aria-label="Application {{ a.code }} absente de {{ c.title }}">✕</span>{% endif %}
       </td>{% endfor %}
-    </tr>{% else %}<tr><td colspan="{{ clusters|length + 1 }}">Aucune application{% if exclude_unknown %} correspondant au filtre{% endif %}.</td></tr>{% endfor %}
+    </tr>{% else %}<tr><td colspan="{{ clusters|length + 1 }}">Aucune application{% if exclude_unknown or selected_cluster is not none %} correspondant au filtre{% endif %}.</td></tr>{% endfor %}
     </tbody>
   </table>
 </section>

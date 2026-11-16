@@ -215,3 +215,40 @@ def test_report_csv_empty_result_has_header_only(client):
         db.execute('INSERT INTO applications(code) VALUES(?)', ('000000',))
     response = client.get('/reports/applications-clusters?exclude_unknown=1&export=csv')
     assert list(csv.reader(io.StringIO(response.text))) == [['code_app']]
+
+
+@pytest.mark.parametrize('cluster_id,exclude_unknown,expected', [
+    ('1', False, ['00000', '00123']), ('1', True, ['00123']),
+    ('2', False, ['00123', '9876']), ('2', True, ['00123', '9876']),
+    ('3', False, []), ('', False, ['00000', '00123', '9876', '9999']),
+])
+def test_report_cluster_filter_and_export(client, cluster_id, exclude_unknown, expected):
+    import csv
+    seed(client)
+    for title in ['Cluster B', 'Cluster vide']:
+        post(client, '/clusters', {'title': title, 'console_url': 'https://example.org', 'api_url': 'https://example.org', 'environment_id': '1'})
+    with sqlite3.connect(client.application.config['DATABASE']) as db:
+        db.executemany('INSERT INTO applications(id,code) VALUES(?,?)', [(1, '00000'), (2, '00123'), (3, '9876'), (4, '9999')])
+        db.executemany('INSERT INTO namespaces(title,cluster_id,application_id) VALUES(?,?,?)', [
+            ('unknown', 1, 1), ('app-00123-dev', 1, 2), ('app-00123-extra', 1, 2),
+            ('app-00123-b', 2, 2), ('app-9876', 2, 3)])
+    query = {'cluster_id': cluster_id, 'exclude_unknown': '1' if exclude_unknown else '0'}
+    page = client.get('/reports/applications-clusters', query_string=query)
+    assert page.status_code == 200
+    assert re.findall(r'data-application="([^"]+)"', page.text) == expected
+    assert 'Cluster A' in page.text and 'Cluster B' in page.text  # keep comparison columns
+    if cluster_id:
+        assert f'value="{cluster_id}" selected' in page.text
+        assert f'name="cluster_id" value="{cluster_id}"' in page.text
+    response = client.get('/reports/applications-clusters', query_string={**query, 'export': 'csv'})
+    assert list(csv.reader(io.StringIO(response.text))) == [['code_app']] + [[code] for code in expected]
+    if not expected:
+        assert 'Aucune application correspondant au filtre.' in page.text
+
+
+@pytest.mark.parametrize('cluster_id', ['invalid', '999999', '-1', '0', '1 OR 1=1'])
+def test_report_rejects_invalid_cluster_filter(client, cluster_id):
+    for export in ['', 'csv']:
+        response = client.get('/reports/applications-clusters', query_string={'cluster_id': cluster_id, 'export': export})
+        assert response.status_code == 400
+        assert 'Cluster' in response.text

@@ -99,10 +99,23 @@ def create_app(config=None):
     @app.get('/reports/applications-clusters')
     def application_cluster_report():
         exclude_unknown = request.args.get('exclude_unknown') == '1'
+        cluster_value = request.args.get('cluster_id', '')
+        try:
+            selected_cluster = int(cluster_value) if cluster_value else None
+        except ValueError:
+            return 'Cluster invalide.', 400
         with db() as conn:
+            clusters = conn.execute(
+                'SELECT c.id,c.title,e.title AS environment_title FROM clusters c '
+                'JOIN environments e ON e.id=c.environment_id ORDER BY e.title,c.title').fetchall()
+            if selected_cluster is not None and not any(c['id'] == selected_cluster for c in clusters):
+                return 'Cluster inconnu.', 400
             applications = conn.execute(
-                "SELECT id,code FROM applications WHERE (? = 0 OR code = '' OR ltrim(code, '0') != '') ORDER BY code",
-                (exclude_unknown,)).fetchall()
+                "SELECT a.id,a.code FROM applications a "
+                "WHERE (? = 0 OR a.code = '' OR ltrim(a.code, '0') != '') "
+                'AND (? IS NULL OR EXISTS (SELECT 1 FROM namespaces n '
+                'WHERE n.application_id=a.id AND n.cluster_id=?)) ORDER BY a.code',
+                (exclude_unknown, selected_cluster, selected_cluster)).fetchall()
             if request.args.get('export') == 'csv':
                 output = io.StringIO(newline='')
                 writer = csv.writer(output)
@@ -111,9 +124,6 @@ def create_app(config=None):
                 return Response(output.getvalue(), mimetype='text/csv', headers={
                     'Content-Disposition': 'attachment; filename=applications.csv'
                 })
-            clusters = conn.execute(
-                'SELECT c.id,c.title,e.title AS environment_title FROM clusters c '
-                'JOIN environments e ON e.id=c.environment_id ORDER BY e.title,c.title').fetchall()
             namespaces = conn.execute(
                 'SELECT application_id,cluster_id,title FROM namespaces '
                 'WHERE application_id IS NOT NULL ORDER BY title').fetchall()
@@ -121,7 +131,8 @@ def create_app(config=None):
         for namespace in namespaces:
             presence.setdefault((namespace['application_id'], namespace['cluster_id']), []).append(namespace['title'])
         return render_template('application_cluster_report.html', applications=applications,
-                               clusters=clusters, presence=presence, exclude_unknown=exclude_unknown)
+                               clusters=clusters, presence=presence, exclude_unknown=exclude_unknown,
+                               selected_cluster=selected_cluster)
 
     def required(name):
         value = request.form.get(name, '').strip()
