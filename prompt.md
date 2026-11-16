@@ -28,12 +28,22 @@ Index ElasticSearch pour le stockage des fichier YAML.
 - Code YAML
 
 # Ecrans
+Chaque écran est une entrée du menu principal.
 
 ## Gestion des environnements
 Un écran permet de gérer les environnements et les clusters.
 
 ## Import des données Grafana
-Un écran propose d'importer pour chaque cluster un fichier CSV.
-Dans chaque fichier CSV, la colonne "namespace" permet d'alimenter les entités Namespace.
-Dans le nom du namespace, il y a un code entre 4 et 6 chiffres représentant le code application de l'application.
-Pour chaque fichier déposé dans l'interface, un tableau permet de visualiser les données lues et voir le code application et le nom du namespace.
+Un écran propose de gérer l'importation de fichiers CSV pour alimenter les namespaces.
+L'écran 
+- affiche un cadre pour chaque environnement
+- et dans le cadre pour l'environnement un sous cadre pour chaque cluster
+- un bouton d'import de fichier CSV
+- un tableau affichant les éléments tirés du CSV
+Les cadres d'environnement sont affichés de façon horizontale et s'adaptent à la largeur de la page.
+Les sous cadres sont aussi affichés de façon horizontale et s'adaptent à la largeur du cadre.
+A chaque fois qu'un fichier CSV est choisi,
+- la tableau est remplacé par les informations tirés du fichier CSV
+- le tableau affiche :
+  - le nom du namespace
+  - le code application du namespace contenu dans le nom (code entre 4 et 6 chiffres représentant le code application de l'application)
