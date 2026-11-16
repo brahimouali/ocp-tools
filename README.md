@@ -34,6 +34,8 @@ dans le volume Compose `elasticsearch-data`.
 
 ## Écrans
 
+Les écrans utilisent toute la largeur disponible de la page.
+
 - `/` : gestion des environnements et des clusters, liste des namespaces.
 - `/grafana` : cadres adaptatifs par environnement et cluster ; sélectionner un CSV remplace immédiatement l’aperçu du cluster. La confirmation enregistre les données. Sans JavaScript, le bouton Prévisualiser reste utilisable.
 - `/pipelines` : création et réindexation des pipelines GoCD.
@@ -48,8 +50,8 @@ dans le volume Compose `elasticsearch-data`.
 - Colonne `namespace` obligatoire, UTF-8 avec ou sans BOM, séparateurs virgule,
   point-virgule ou tabulation. Maximum 5 Mo par requête et 10 000 lignes par fichier.
 - Extraction d’une séquence unique de 4 à 6 chiffres comme code application.
-  Les zéros initiaux sont conservés. Un code absent ou ambigu laisse le namespace
-  sans application ; la ligne reste visible et importable.
+  Les zéros initiaux sont conservés. Un code absent ou ambigu utilise le code
+  application `00000`, dans l’aperçu et lors de l’enregistrement.
 - Namespaces en environnement `DEV`, uniques par cluster, regroupés par code
   application. Réimporter fusionne les doublons et actualise leur rattachement.
 - Pipelines : titre et YAML validé, conservés dans SQLite et indexés dans

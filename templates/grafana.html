@@ -4,7 +4,7 @@
 {% for e in environments %}<article class="environment-card"><h3>{{ e.title }} — {{ e.kind }}</h3><div class="cluster-grid">
 {% for c in clusters if c.environment_id == e.id %}<article class="cluster-card"><h4>{{ c.title }}</h4>
 <form class="csv-import" method="post" action="/import" enctype="multipart/form-data">{{ csrf() }}<input type="hidden" name="cluster_id" value="{{ c.id }}"><label>Importer un fichier CSV<input type="file" name="files" accept=".csv,text/csv" required></label><button>Prévisualiser</button></form>
-<div class="import-result" aria-live="polite"><table><thead><tr><th>Namespace</th><th>Code application</th></tr></thead><tbody>{% for n in namespaces if n.cluster_id == c.id %}<tr><td>{{ n.title }}</td><td>{{ n.code or 'Non identifié' }}</td></tr>{% else %}<tr><td colspan="2">Aucun namespace importé.</td></tr>{% endfor %}</tbody></table></div>
+<div class="import-result" aria-live="polite"><table><thead><tr><th>Namespace</th><th>Code application</th></tr></thead><tbody>{% for n in namespaces if n.cluster_id == c.id %}<tr><td>{{ n.title }}</td><td>{{ n.code or '00000' }}</td></tr>{% else %}<tr><td colspan="2">Aucun namespace importé.</td></tr>{% endfor %}</tbody></table></div>
 </article>{% else %}<p>Aucun cluster dans cet environnement.</p>{% endfor %}</div></article>{% else %}<p>Créez un environnement et un cluster dans la gestion des environnements.</p>{% endfor %}
 </div></section>{% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='grafana.js') }}" defer></script>{% endblock %}

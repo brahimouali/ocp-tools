@@ -41,7 +41,7 @@ def parse_csv(raw):
         if not namespace:
             raise ValueError(f'Ligne {number} : namespace vide.')
         codes = re.findall(r'(?<!\d)\d{4,6}(?!\d)', namespace)
-        code = codes[0] if len(codes) == 1 else None
+        code = codes[0] if len(codes) == 1 else '00000'
         rows.append({'namespace': namespace, 'code': code, 'data': row})
         if len(rows) > 10000:
             raise ValueError('Maximum 10 000 lignes par fichier.')
@@ -175,10 +175,9 @@ def create_app(config=None):
                 with db() as conn:
                     for preview in previews:
                         for row in preview['rows']:
-                            application_id = None
-                            if row['code']:
-                                conn.execute('INSERT OR IGNORE INTO applications(code) VALUES(?)', (row['code'],))
-                                application_id = conn.execute('SELECT id FROM applications WHERE code=?', (row['code'],)).fetchone()['id']
+                            code = row['code'] or '00000'
+                            conn.execute('INSERT OR IGNORE INTO applications(code) VALUES(?)', (code,))
+                            application_id = conn.execute('SELECT id FROM applications WHERE code=?', (code,)).fetchone()['id']
                             conn.execute('INSERT INTO namespaces(title,cluster_id,application_id) VALUES(?,?,?) ON CONFLICT(cluster_id,title) DO UPDATE SET application_id=excluded.application_id', (row['namespace'], cluster, application_id))
                 flash('Import terminé. Les doublons ont été fusionnés.', 'success')
                 return redirect('/grafana')

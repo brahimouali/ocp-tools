@@ -47,7 +47,7 @@ def test_validation_csrf_and_urls(client):
     assert 'URL HTTP' in post(client, '/clusters', {'title': 'Bad', 'console_url': 'javascript:alert(1)', 'api_url': 'https://api.test', 'environment_id': '1'}).text
 
 
-@pytest.mark.parametrize('name,expected', [('app-1234-dev', '1234'), ('app123456-dev', '123456'), ('app-1234567', None), ('app-1234-5678', None), ('no-code', None), ('app-00123', '00123')])
+@pytest.mark.parametrize('name,expected', [('app-1234-dev', '1234'), ('app123456-dev', '123456'), ('app-1234567', '00000'), ('app-1234-5678', '00000'), ('no-code', '00000'), ('app-00123', '00123')])
 def test_codes(name, expected):
     assert parse_csv(f'namespace\n{name}\n'.encode())[0]['code'] == expected
 
@@ -133,3 +133,21 @@ def test_inline_preview_replaces_data_without_saving(client):
     result = post(client, '/import', {'cluster_id': '1', 'preview': token, 'confirm': 'yes'})
     assert result.request.path == '/grafana'
     assert 'app-9876-dev' in result.text
+
+
+def test_unknown_codes_preview_and_persistence(client):
+    seed(client)
+    response = post(client, '/import', {
+        'cluster_id': '1',
+        'files': (io.BytesIO(b'namespace\nno-code\napp-1234-5678\napp-00123-dev\n'), 'codes.csv')
+    })
+    assert response.text.count('<td>00000</td>') == 2
+    assert '<td>00123</td>' in response.text
+    token = re.search(r'name="preview" value="([^"]+)"', response.text).group(1)
+    for _ in range(2):
+        result = post(client, '/import', {'cluster_id': '1', 'preview': token, 'confirm': 'yes'})
+        assert result.text.count('<td>00000</td>') == 2
+    with sqlite3.connect(client.application.config['DATABASE']) as db:
+        rows = db.execute('SELECT n.title,a.code FROM namespaces n JOIN applications a ON n.application_id=a.id ORDER BY n.title').fetchall()
+        assert rows == [('app-00123-dev', '00123'), ('app-1234-5678', '00000'), ('no-code', '00000')]
+        assert db.execute('SELECT count(*) FROM applications WHERE code=?', ('00000',)).fetchone()[0] == 1
