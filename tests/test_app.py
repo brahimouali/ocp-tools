@@ -151,3 +151,39 @@ def test_unknown_codes_preview_and_persistence(client):
         rows = db.execute('SELECT n.title,a.code FROM namespaces n JOIN applications a ON n.application_id=a.id ORDER BY n.title').fetchall()
         assert rows == [('app-00123-dev', '00123'), ('app-1234-5678', '00000'), ('no-code', '00000')]
         assert db.execute('SELECT count(*) FROM applications WHERE code=?', ('00000',)).fetchone()[0] == 1
+
+
+def test_application_cluster_report_matrix_and_filter(client):
+    seed(client)
+    post(client, '/clusters', {'title': 'Cluster B', 'console_url': 'https://b.example.org', 'api_url': 'https://b.example.org', 'environment_id': '1'})
+    with sqlite3.connect(client.application.config['DATABASE']) as db:
+        db.executemany('INSERT INTO applications(id,code) VALUES(?,?)', [(1, '00123'), (2, '00000'), (3, '9999')])
+        db.executemany('INSERT INTO namespaces(title,cluster_id,application_id) VALUES(?,?,?)', [
+            ('app-00123-dev', 1, 1), ('app-00123-extra', 1, 1),
+            ('<script>alert(1)</script>', 2, 1), ('unknown', 2, 2)])
+    page = client.get('/reports/applications-clusters')
+    assert page.status_code == 200
+    html = page.text
+    assert 'Cluster A' in html and 'Cluster B' in html
+    assert html.count('class="presence-status present"') == 3
+    assert html.count('class="presence-status absent"') == 3
+    assert 'app-00123-dev' in html and 'app-00123-extra' in html
+    assert '&lt;script&gt;' in html and '<script>alert(1)</script>' not in html
+    assert 'data-application="9999"' in html  # applications without namespaces are retained
+    filtered = client.get('/reports/applications-clusters?exclude_unknown=1').text
+    assert 'data-application="00000"' not in filtered
+    assert 'data-application="00123"' in filtered
+    assert filtered.count('class="presence-status present"') == 2
+    assert filtered.count('class="presence-status absent"') == 2
+    assert 'name="exclude_unknown" value="1" checked' in filtered
+    assert 'data-application="00000"' in client.get('/reports/applications-clusters?exclude_unknown=0').text
+    assert '/reports/applications-clusters' in client.get('/').text
+
+
+def test_application_cluster_report_empty_states(client):
+    html = client.get('/reports/applications-clusters').text
+    assert 'Aucun cluster.' in html and 'Aucune application.' in html
+    with sqlite3.connect(client.application.config['DATABASE']) as db:
+        db.execute('INSERT INTO applications(code) VALUES(?)', ('00000',))
+    html = client.get('/reports/applications-clusters?exclude_unknown=1').text
+    assert 'Aucune application correspondant au filtre.' in html

@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <h2>Rapport application/cluster</h2>
+  <form method="get">
+    <label class="report-filter"><input type="checkbox" name="exclude_unknown" value="1" {% if exclude_unknown %}checked{% endif %}>Exclure le code application 00000</label>
+    <button>Appliquer le filtre</button>
+  </form>
+  <p>✓ Présente · ✕ Absente. Survolez une présence ou sélectionnez-la pour afficher ses namespaces.</p>
+  {% if not clusters %}<p>Aucun cluster. Créez un cluster dans la gestion des environnements.</p>{% endif %}
+  <table class="application-report">
+    <caption>Présence des applications dans les clusters OpenShift</caption>
+    <thead><tr><th scope="col">Code application</th>{% for c in clusters %}<th scope="col">{{ c.title }}<br><small>{{ c.environment_title }}</small></th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for a in applications %}<tr data-application="{{ a.code }}"><th scope="row">{{ a.code }}</th>
+      {% for c in clusters %}{% set names = presence.get((a.id,c.id), []) %}<td>
+        {% if names %}
+        <button type="button" class="presence-status present" aria-label="Application {{ a.code }} présente dans {{ c.title }}" aria-describedby="namespaces-{{ a.id }}-{{ c.id }}" aria-expanded="false"><span aria-hidden="true">✓</span></button>
+        <div id="namespaces-{{ a.id }}-{{ c.id }}" class="namespace-popup" popover="manual" role="tooltip"><strong>Namespaces — {{ a.code }} / {{ c.title }}</strong><ul>{% for name in names %}<li>{{ name }}</li>{% endfor %}</ul></div>
+        {% else %}<span class="presence-status absent" role="img" aria-label="Application {{ a.code }} absente de {{ c.title }}">✕</span>{% endif %}
+      </td>{% endfor %}
+    </tr>{% else %}<tr><td colspan="{{ clusters|length + 1 }}">Aucune application{% if exclude_unknown %} correspondant au filtre{% endif %}.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+<style>
+.report-filter{flex-direction:row;align-items:center}.application-report td{text-align:center}.presence-status{font-size:24px;font-weight:bold}.present{color:#166534;background:#dcfce7;border:1px solid #166534}.absent{color:#b91c1c}.namespace-popup{position:fixed;inset:auto;margin:0;box-sizing:border-box;max-width:calc(100vw - 24px);max-height:50vh;overflow:auto;border:1px solid #52657a;border-radius:8px;padding:16px;background:white;color:#172b43;box-shadow:0 4px 18px #142b4630;overflow-wrap:anywhere}.namespace-popup ul{margin-bottom:0;padding-left:20px}
+</style>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='application_report.js') }}" defer></script>{% endblock %}

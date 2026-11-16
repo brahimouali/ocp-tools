@@ -39,6 +39,7 @@ Les écrans utilisent toute la largeur disponible de la page.
 - `/` : gestion des environnements et des clusters, liste des namespaces.
 - `/grafana` : cadres adaptatifs par environnement et cluster ; sélectionner un CSV remplace immédiatement l’aperçu du cluster. La confirmation enregistre les données. Sans JavaScript, le bouton Prévisualiser reste utilisable.
 - `/pipelines` : création et réindexation des pipelines GoCD.
+- `/reports/applications-clusters` : présence de chaque application par cluster, namespaces au survol, au focus clavier ou au toucher ; filtre pour exclure `00000`.
 
 ## Fonctionnalités
 

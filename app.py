@@ -96,6 +96,25 @@ def create_app(config=None):
         template = {'/grafana': 'grafana.html', '/pipelines': 'pipelines.html'}.get(request.path, 'index.html')
         return render_template(template, environments=environments, clusters=clusters, namespaces=namespaces, pipelines=pipelines)
 
+    @app.get('/reports/applications-clusters')
+    def application_cluster_report():
+        exclude_unknown = request.args.get('exclude_unknown') == '1'
+        with db() as conn:
+            applications = conn.execute(
+                'SELECT id,code FROM applications WHERE (? = 0 OR code != ?) ORDER BY code',
+                (exclude_unknown, '00000')).fetchall()
+            clusters = conn.execute(
+                'SELECT c.id,c.title,e.title AS environment_title FROM clusters c '
+                'JOIN environments e ON e.id=c.environment_id ORDER BY e.title,c.title').fetchall()
+            namespaces = conn.execute(
+                'SELECT application_id,cluster_id,title FROM namespaces '
+                'WHERE application_id IS NOT NULL ORDER BY title').fetchall()
+        presence = {}
+        for namespace in namespaces:
+            presence.setdefault((namespace['application_id'], namespace['cluster_id']), []).append(namespace['title'])
+        return render_template('application_cluster_report.html', applications=applications,
+                               clusters=clusters, presence=presence, exclude_unknown=exclude_unknown)
+
     def required(name):
         value = request.form.get(name, '').strip()
         if not value:
