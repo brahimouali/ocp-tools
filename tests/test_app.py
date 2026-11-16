@@ -187,3 +187,31 @@ def test_application_cluster_report_empty_states(client):
         db.execute('INSERT INTO applications(code) VALUES(?)', ('00000',))
     html = client.get('/reports/applications-clusters?exclude_unknown=1').text
     assert 'Aucune application correspondant au filtre.' in html
+
+
+@pytest.mark.parametrize('exclude_unknown', [False, True])
+def test_report_zero_only_filter_and_csv_match_display(client, exclude_unknown):
+    import csv
+    codes = ['0000', '00000', '000000', '0001', '00123', '1000', '999999']
+    with sqlite3.connect(client.application.config['DATABASE']) as db:
+        db.executemany('INSERT INTO applications(code) VALUES(?)', [(code,) for code in codes])
+    query = {'exclude_unknown': '1'} if exclude_unknown else {}
+    page = client.get('/reports/applications-clusters', query_string=query)
+    displayed = re.findall(r'data-application="([^"]+)"', page.text)
+    expected = sorted(code for code in codes if not exclude_unknown or set(code) != {'0'})
+    assert displayed == expected
+    exported = client.get('/reports/applications-clusters', query_string={**query, 'export': 'csv'})
+    assert exported.status_code == 200
+    assert exported.mimetype == 'text/csv'
+    assert 'attachment; filename=applications.csv' == exported.headers['Content-Disposition']
+    rows = list(csv.reader(io.StringIO(exported.text)))
+    assert rows == [['code_app']] + [[code] for code in displayed]
+    assert '00123' in exported.text
+
+
+def test_report_csv_empty_result_has_header_only(client):
+    import csv
+    with sqlite3.connect(client.application.config['DATABASE']) as db:
+        db.execute('INSERT INTO applications(code) VALUES(?)', ('000000',))
+    response = client.get('/reports/applications-clusters?exclude_unknown=1&export=csv')
+    assert list(csv.reader(io.StringIO(response.text))) == [['code_app']]

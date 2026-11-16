@@ -3,8 +3,13 @@
 <section>
   <h2>Rapport application/cluster</h2>
   <form method="get">
-    <label class="report-filter"><input type="checkbox" name="exclude_unknown" value="1" {% if exclude_unknown %}checked{% endif %}>Exclure le code application 00000</label>
+    <label class="report-filter"><input type="checkbox" name="exclude_unknown" value="1" {% if exclude_unknown %}checked{% endif %}>Exclure les codes application composés uniquement de zéros</label>
     <button>Appliquer le filtre</button>
+  </form>
+  <form method="get" class="report-export">
+    <input type="hidden" name="export" value="csv">
+    {% if exclude_unknown %}<input type="hidden" name="exclude_unknown" value="1">{% endif %}
+    <button>Exporter en CSV</button>
   </form>
   <p>✓ Présente · ✕ Absente. Survolez une présence ou sélectionnez-la pour afficher ses namespaces.</p>
   {% if not clusters %}<p>Aucun cluster. Créez un cluster dans la gestion des environnements.</p>{% endif %}

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import requests
 import yaml
-from flask import Flask, flash, redirect, render_template, request, session, url_for, jsonify
+from flask import Flask, flash, redirect, render_template, request, session, url_for, jsonify, Response
 import secrets
 from itsdangerous import URLSafeTimedSerializer, BadSignature
 
@@ -101,8 +101,16 @@ def create_app(config=None):
         exclude_unknown = request.args.get('exclude_unknown') == '1'
         with db() as conn:
             applications = conn.execute(
-                'SELECT id,code FROM applications WHERE (? = 0 OR code != ?) ORDER BY code',
-                (exclude_unknown, '00000')).fetchall()
+                "SELECT id,code FROM applications WHERE (? = 0 OR code = '' OR ltrim(code, '0') != '') ORDER BY code",
+                (exclude_unknown,)).fetchall()
+            if request.args.get('export') == 'csv':
+                output = io.StringIO(newline='')
+                writer = csv.writer(output)
+                writer.writerow(['code_app'])
+                writer.writerows((application['code'],) for application in applications)
+                return Response(output.getvalue(), mimetype='text/csv', headers={
+                    'Content-Disposition': 'attachment; filename=applications.csv'
+                })
             clusters = conn.execute(
                 'SELECT c.id,c.title,e.title AS environment_title FROM clusters c '
                 'JOIN environments e ON e.id=c.environment_id ORDER BY e.title,c.title').fetchall()
