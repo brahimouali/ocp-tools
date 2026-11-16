@@ -49,3 +49,9 @@ A chaque fois qu'un fichier CSV est choisi,
   - le nom du namespace
   - le code application du namespace contenu dans le nom (code entre 4 et 6 chiffres représentant le code application de l'application)
   - si le code application n'est pas reconnu, alors le code 00000 est utilisé
+
+## Rapport application/cluster
+Cet écran propose un tableau qui liste toutes les applications et pour chaque cluster met une icone:
+- une icone validation verte indique que l'application a un namespace dans ce cluster et au survol de l'icone, une liste des namespaces apparaît en popup
+- une icone absence rouge indique que l'application n'a pas de namespace dans ce cluster
+Un filtre permet d'exclure les 00000.
