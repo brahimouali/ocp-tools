@@ -8,7 +8,7 @@ from pathlib import Path
 
 import requests
 import yaml
-from flask import Flask, flash, redirect, render_template, request, session, url_for
+from flask import Flask, flash, redirect, render_template, request, session, url_for, jsonify
 import secrets
 from itsdangerous import URLSafeTimedSerializer, BadSignature
 
@@ -84,6 +84,8 @@ def create_app(config=None):
     def too_large(error):
         return 'Fichier trop volumineux (maximum 5 Mo).', 413
 
+    @app.get('/pipelines')
+    @app.get('/grafana')
     @app.route('/')
     def index():
         with db() as conn:
@@ -91,7 +93,8 @@ def create_app(config=None):
             clusters = conn.execute('SELECT c.*, e.title AS environment_title FROM clusters c JOIN environments e ON e.id=c.environment_id ORDER BY c.title').fetchall()
             namespaces = conn.execute('SELECT n.*, c.title AS cluster_title, a.code FROM namespaces n JOIN clusters c ON c.id=n.cluster_id LEFT JOIN applications a ON a.id=n.application_id ORDER BY a.code,n.title').fetchall()
             pipelines = conn.execute('SELECT * FROM pipelines ORDER BY id DESC').fetchall()
-        return render_template('index.html', environments=environments, clusters=clusters, namespaces=namespaces, pipelines=pipelines)
+        template = {'/grafana': 'grafana.html', '/pipelines': 'pipelines.html'}.get(request.path, 'index.html')
+        return render_template(template, environments=environments, clusters=clusters, namespaces=namespaces, pipelines=pipelines)
 
     def required(name):
         value = request.form.get(name, '').strip()
@@ -178,11 +181,16 @@ def create_app(config=None):
                                 application_id = conn.execute('SELECT id FROM applications WHERE code=?', (row['code'],)).fetchone()['id']
                             conn.execute('INSERT INTO namespaces(title,cluster_id,application_id) VALUES(?,?,?) ON CONFLICT(cluster_id,title) DO UPDATE SET application_id=excluded.application_id', (row['namespace'], cluster, application_id))
                 flash('Import terminé. Les doublons ont été fusionnés.', 'success')
-                return redirect(url_for('index'))
-            return render_template('preview.html', previews=previews, cluster_id=cluster, preview_token=signer.dumps({'cluster': cluster, 'previews': previews}))
+                return redirect('/grafana')
+            context = dict(previews=previews, cluster_id=cluster, preview_token=signer.dumps({'cluster': cluster, 'previews': previews}))
+            if request.headers.get('X-Requested-With') == 'fetch':
+                return jsonify(html=render_template('preview_content.html', **context))
+            return render_template('preview.html', **context)
         except (ValueError, csv.Error, sqlite3.IntegrityError) as exc:
+            if request.headers.get('X-Requested-With') == 'fetch':
+                return jsonify(error=f'Import impossible : {exc}'), 400
             flash(f'Import impossible : {exc}', 'error')
-            return redirect(url_for('index'))
+            return redirect('/grafana')
 
     @app.post('/pipelines')
     def pipeline_save():
@@ -195,7 +203,7 @@ def create_app(config=None):
             return index_pipeline(identifier)
         except (ValueError, yaml.YAMLError) as exc:
             flash(f'Pipeline invalide : {exc}', 'error')
-            return redirect(url_for('index'))
+            return redirect('/pipelines')
 
     @app.post('/pipelines/<int:identifier>/index')
     def index_pipeline(identifier):
@@ -211,7 +219,7 @@ def create_app(config=None):
             flash('Pipeline enregistré et indexé dans Elasticsearch.', 'success')
         except requests.RequestException:
             flash('Pipeline conservé dans SQLite. Elasticsearch est indisponible : réessayez l’indexation.', 'error')
-        return redirect(url_for('index'))
+        return redirect('/pipelines')
 
     return app
 

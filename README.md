@@ -32,6 +32,12 @@ Variables de configuration :
 SQLite initialise son schéma automatiquement. Les données Elasticsearch restent
 dans le volume Compose `elasticsearch-data`.
 
+## Écrans
+
+- `/` : gestion des environnements et des clusters, liste des namespaces.
+- `/grafana` : cadres adaptatifs par environnement et cluster ; sélectionner un CSV remplace immédiatement l’aperçu du cluster. La confirmation enregistre les données. Sans JavaScript, le bouton Prévisualiser reste utilisable.
+- `/pipelines` : création et réindexation des pipelines GoCD.
+
 ## Fonctionnalités
 
 - Création, modification et suppression des environnements et clusters.
