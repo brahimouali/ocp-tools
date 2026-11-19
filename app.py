@@ -10,9 +10,13 @@ from pathlib import Path
 
 import requests
 import yaml
-from flask import Flask, flash, redirect, render_template, request, session, url_for, jsonify, Response
+from flask import Flask, flash, redirect, render_template, request, session, url_for, jsonify, Response, send_file
 import secrets
 from itsdangerous import URLSafeTimedSerializer, BadSignature
+
+from openpyxl import Workbook
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from ocsin import ATTRIBUTES, parse_ocsin
 
@@ -62,6 +66,42 @@ def parse_csv(raw):
     if not rows:
         raise ValueError('Le CSV ne contient aucune donnée.')
     return rows
+
+
+def export_application_report(applications, clusters, presence, ocsin_by_application):
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = 'Applications'
+    sheet.append([
+        'Code application',
+        *(f"Cluster — {cluster['title']} ({cluster['environment_title']})" for cluster in clusters),
+        *ATTRIBUTES.values(),
+    ])
+    for row_number, application in enumerate(applications, start=2):
+        application_id = application['id']
+        attributes = ocsin_by_application.get(application_id, {})
+        values = [
+            application['code'],
+            *(', '.join(presence.get((application_id, cluster['id']), ())) or 'Absente'
+              for cluster in clusters),
+            *(attributes.get(column) for column in ATTRIBUTES),
+        ]
+        for column_number, value in enumerate(values, start=1):
+            cell = sheet.cell(row_number, column_number)
+            if isinstance(value, str):
+                cell.value = ILLEGAL_CHARACTERS_RE.sub('', value)
+                cell.data_type = 's'
+            else:
+                cell.value = value
+
+    table = Table(displayName='Applications', ref=sheet.dimensions)
+    table.tableStyleInfo = TableStyleInfo(name='TableStyleMedium2', showRowStripes=True)
+    sheet.add_table(table)
+    sheet.freeze_panes = 'B2'
+    output = io.BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name='applications.xlsx')
 
 
 def create_app(config=None):
@@ -195,6 +235,8 @@ def create_app(config=None):
         for namespace in namespaces:
             presence.setdefault((namespace['application_id'], namespace['cluster_id']), []).append(namespace['title'])
         ocsin_by_application = {a['id']: json.loads(a['attributes']) for a in applications if a['attributes'] is not None}
+        if request.args.get('export') == 'xlsx':
+            return export_application_report(applications, clusters, presence, ocsin_by_application)
         return render_template('application_cluster_report.html', applications=applications,
                                clusters=clusters, presence=presence, exclude_unknown=exclude_unknown,
                                selected_cluster=selected_cluster, ocsin_columns=ATTRIBUTES,

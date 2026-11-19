@@ -7,8 +7,7 @@ from unittest.mock import Mock
 
 import pytest
 import requests
-from datetime import datetime
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from app import create_app, parse_csv
 from ocsin import COLUMNS, EXCEL_COLUMNS, EXCEL_SHEET
@@ -238,6 +237,8 @@ def test_report_cluster_filter_and_export(client, cluster_id, exclude_unknown, e
         db.executemany('INSERT INTO namespaces(title,cluster_id,application_id) VALUES(?,?,?)', [
             ('unknown', 1, 1), ('app-00123-dev', 1, 2), ('app-00123-extra', 1, 2),
             ('app-00123-b', 2, 2), ('app-9876', 2, 3)])
+        db.execute('INSERT INTO ocsin_applications(application_id, attributes) VALUES (?, ?)',
+                   (2, json.dumps({'C3': '=1+1', 'C28': 0})))
     query = {'cluster_id': cluster_id, 'exclude_unknown': '1' if exclude_unknown else '0'}
     page = client.get('/reports/applications-clusters', query_string=query)
     assert page.status_code == 200
@@ -248,13 +249,33 @@ def test_report_cluster_filter_and_export(client, cluster_id, exclude_unknown, e
         assert f'name="cluster_id" value="{cluster_id}"' in page.text
     response = client.get('/reports/applications-clusters', query_string={**query, 'export': 'csv'})
     assert list(csv.reader(io.StringIO(response.text))) == [['code_app']] + [[code] for code in expected]
+    assert 'name="export" value="xlsx"' in page.text
+    response = client.get('/reports/applications-clusters', query_string={**query, 'export': 'xlsx'})
+    assert response.status_code == 200
+    assert response.mimetype == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    assert response.headers['Content-Disposition'] == 'attachment; filename=applications.xlsx'
+    workbook = load_workbook(io.BytesIO(response.data))
+    sheet = workbook['Applications']
+    rows = list(sheet.values)
+    assert rows[0][:4] == ('Code application', 'Cluster — Cluster A (Dev)',
+                           'Cluster — Cluster B (Dev)', 'Cluster — Cluster vide (Dev)')
+    assert [row[0] for row in rows[1:]] == expected
+    assert sheet.tables['Applications'].ref == sheet.dimensions
+    if '00123' in expected:
+        row = rows[expected.index('00123') + 1]
+        assert row[1:4] == ('app-00123-dev, app-00123-extra', 'app-00123-b', 'Absente')
+        name_column = rows[0].index('Application Nom')
+        assert row[name_column] == '=1+1'
+        assert sheet.cell(expected.index('00123') + 2, name_column + 1).data_type == 's'
+        assert row[rows[0].index('Application Utilisateurs concernés')] == 0
+    workbook.close()
     if not expected:
         assert 'Aucune application correspondant au filtre.' in page.text
 
 
 @pytest.mark.parametrize('cluster_id', ['invalid', '999999', '-1', '0', '1 OR 1=1'])
 def test_report_rejects_invalid_cluster_filter(client, cluster_id):
-    for export in ['', 'csv']:
+    for export in ['', 'csv', 'xlsx']:
         response = client.get('/reports/applications-clusters', query_string={'cluster_id': cluster_id, 'export': export})
         assert response.status_code == 400
         assert 'Cluster' in response.text

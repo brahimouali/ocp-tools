@@ -40,7 +40,7 @@ Les écrans utilisent toute la largeur disponible de la page.
 - `/grafana` : cadres adaptatifs par environnement et cluster ; sélectionner un CSV remplace immédiatement l’aperçu du cluster. La confirmation enregistre les données. Sans JavaScript, le bouton Prévisualiser reste utilisable.
 - `/grafana/ocsin-applications` : import des attributs du rapport Grafana OCSIN Applications.
 - `/pipelines` : création et réindexation des pipelines GoCD.
-- `/reports/applications-clusters` : présence de chaque application par cluster, namespaces au survol, au focus clavier ou au toucher ; filtre par cluster pour retenir les applications ayant un namespace dans le cluster choisi, tout en conservant les colonnes de comparaison ; filtre pour exclure tous les codes composés uniquement de zéros ; export CSV des applications affichées avec une seule colonne `code_app` (zéros initiaux conservés dans le fichier).
+- `/reports/applications-clusters` : présence de chaque application par cluster, namespaces au survol, au focus clavier ou au toucher ; filtre par cluster pour retenir les applications ayant un namespace dans le cluster choisi, tout en conservant les colonnes de comparaison ; filtre pour exclure tous les codes composés uniquement de zéros ; export CSV des applications affichées avec une seule colonne `code_app` (zéros initiaux conservés dans le fichier). L’export Excel reprend les applications filtrées, les attributs OCSIN et les namespaces par cluster dans un tableau Excel.
 
 ## Fonctionnalités
 

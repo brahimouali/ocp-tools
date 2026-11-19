@@ -11,10 +11,10 @@
     <button>Appliquer le filtre</button>
   </form>
   <form method="get" class="report-export">
-    <input type="hidden" name="export" value="csv">
     {% if exclude_unknown %}<input type="hidden" name="exclude_unknown" value="1">{% endif %}
     {% if selected_cluster is not none %}<input type="hidden" name="cluster_id" value="{{ selected_cluster }}">{% endif %}
-    <button>Exporter en CSV</button>
+    <button name="export" value="csv">Exporter en CSV</button>
+    <button name="export" value="xlsx">Exporter en Excel</button>
   </form>
   <p>✓ Présente · ✕ Absente. Survolez une présence ou sélectionnez-la pour afficher ses namespaces.</p>
   {% if not clusters %}<p>Aucun cluster. Créez un cluster dans la gestion des environnements.</p>{% endif %}
