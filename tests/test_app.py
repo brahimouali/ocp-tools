@@ -1,10 +1,13 @@
 import io
+import json
 import re
+from pathlib import Path
 import sqlite3
 from unittest.mock import Mock
 
 import pytest
 import requests
+from pathlib import Path
 from app import create_app, parse_csv
 
 
@@ -295,3 +298,28 @@ def test_ocsin_import_rejects_invalid_file_atomically(client):
     })
     assert 'Import OCSIN impossible' in response.text
     assert '12345' not in client.get('/reports/applications-clusters?export=csv').text
+
+
+def test_ocsin_import_accepts_supplied_grafana_panel(client):
+    sample = Path(__file__).resolve().parents[1] / 'prompt-extras' / 'ocsin-applications-anonymized.json'
+    with sample.open('rb') as upload:
+        response = post(client, '/grafana/ocsin-applications', {'file': (upload, sample.name)})
+    assert 'Import OCSIN terminé : 10' in response.text
+    report = client.get('/reports/applications-clusters').text
+    assert 'data-application="APP-001"' in report
+    assert 'SAP ERP' in report
+    assert 'Lotus Notes' in report
+    assert client.get('/reports/applications-clusters?export=csv').text.splitlines() == [
+        'code_app', *(f'APP-{i:03}' for i in range(1, 11)),
+    ]
+
+
+def test_ocsin_panel_import_rejects_non_literal_query(client):
+    sample = Path(__file__).resolve().parents[1] / 'prompt-extras' / 'ocsin-applications-anonymized.json'
+    panel = json.loads(sample.read_bytes())
+    panel['targets'][0]['sourceQuery']['rawQuery'] += '; SELECT 1'
+    response = post(client, '/grafana/ocsin-applications', {
+        'file': (io.BytesIO(json.dumps(panel).encode()), sample.name),
+    })
+    assert 'Import OCSIN impossible' in response.text
+    assert client.get('/reports/applications-clusters?export=csv').text.splitlines() == ['code_app']

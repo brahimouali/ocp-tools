@@ -40,6 +40,52 @@ ATTRIBUTES = {key: label for key, label in COLUMNS.items() if key != CODE_COLUMN
 COLUMN_KEYS = {**{key: key for key in COLUMNS}, **{label: key for key, label in COLUMNS.items()}}
 
 
+# Read only the literal SELECT rows embedded in the panel. Never execute its SQL.
+PANEL_SELECT = re.compile(r"\s*SELECT\s+", re.IGNORECASE)
+PANEL_VALUE = re.compile(r"\s*'((?:[^']|'')*)'\s*")
+PANEL_UNION = re.compile(r"UNION\s+ALL\s+", re.IGNORECASE)
+PANEL_END = re.compile(r";?\s*\Z")
+
+
+def panel_records(panel):
+    try:
+        targets = panel['targets']
+        if len(targets) != 1:
+            raise ValueError
+        query = targets[0]['sourceQuery']['rawQuery']
+        if not isinstance(query, str):
+            raise ValueError
+    except (KeyError, IndexError, TypeError, ValueError) as exc:
+        raise ValueError('Le panneau Grafana doit contenir une requête avec les lignes du rapport.') from exc
+
+    error = 'La requête du panneau doit contenir uniquement des lignes SELECT de 28 valeurs texte, séparées par UNION ALL.'
+    position = 0
+    while True:
+        select = PANEL_SELECT.match(query, position)
+        if select is None:
+            raise ValueError(error)
+        position = select.end()
+        row = {}
+        for column in COLUMNS:
+            if row:
+                if query[position:position + 1] != ',':
+                    raise ValueError(error)
+                position += 1
+            value = PANEL_VALUE.match(query, position)
+            if value is None:
+                raise ValueError(error)
+            row[column] = value[1].replace("''", "'")
+            position = value.end()
+        if PANEL_END.match(query, position):
+            yield row
+            return
+        union = PANEL_UNION.match(query, position)
+        if union is None:
+            raise ValueError(error)
+        yield row
+        position = union.end()
+
+
 def parse_ocsin(raw):
     try:
         content = raw.decode('utf-8-sig')
@@ -50,8 +96,8 @@ def parse_ocsin(raw):
 
     if content.lstrip().startswith(('[', '{')):
         records = json.loads(content)
-        if not isinstance(records, list):
-            raise ValueError('Le JSON doit contenir une liste de lignes. Une configuration de panneau Grafana ne contient pas les données du rapport.')
+        if isinstance(records, dict):
+            records = panel_records(records)
     else:
         try:
             dialect = csv.Sniffer().sniff(content[:8192], delimiters=',;\t')
@@ -81,8 +127,8 @@ def parse_ocsin(raw):
         code = values.pop(CODE_COLUMN, None)
         if type(code) is int:
             code = str(code)
-        if not isinstance(code, str) or not re.fullmatch(r'[0-9]{4,6}', code.strip()):
-            raise ValueError(f'Entrée {number} : « {COLUMNS[CODE_COLUMN]} » doit contenir un code de 4 à 6 chiffres.')
+        if not isinstance(code, str) or not re.fullmatch(r'(?:[0-9]{4,6}|APP-[0-9]{3,6})', code.strip()):
+            raise ValueError(f'Entrée {number} : « {COLUMNS[CODE_COLUMN]} » doit contenir un code de 4 à 6 chiffres ou un identifiant APP- suivi de 3 à 6 chiffres.')
         code = code.strip()
         if code in applications:
             raise ValueError(f'Entrée {number} : code application {code} en double.')

@@ -77,10 +77,13 @@ alias `C1` à `C28` de la configuration du panneau. La colonne
 sur 4 à 6 chiffres. Dans un JSON, gardez les codes avec zéros initiaux sous
 forme de chaînes, par exemple `[{"C2":"01234","C3":"Application exemple"}]`.
 
-Le fichier `prompt-extras/ocsin-applications-anonymized.json` décrit les colonnes
-du panneau et ne contient aucune ligne d’application. L’import crée les
-applications manquantes et remplace les attributs OCSIN des codes présents
-dans le fichier. Les attributs apparaissent dans le rapport application/cluster.
+Vous pouvez aussi importer directement le panneau Grafana
+`prompt-extras/ocsin-applications-anonymized.json`. L’import lit les valeurs
+texte des lignes `SELECT … UNION ALL` présentes dans le fichier, sans exécuter
+la requête. Les identifiants anonymisés comme `APP-001` sont conservés tels quels.
+L’import crée les applications manquantes et remplace les attributs OCSIN des
+codes présents dans le fichier. Ces attributs apparaissent dans le rapport
+application/cluster.
 
 ## Vérifications
 
