@@ -51,7 +51,29 @@ A chaque fois qu'un fichier CSV est choisi,
   - si le code application n'est pas reconnu, alors le code 00000 est utilisé
 
 ## Import du rapport grafana "OCSIN Applications"
-A partir du fichier d'exemple de données : prompt-extras/ocsin-applications-anonymized.json, rajoute les colonnes de ce fichier comme des attributs d'une application dans une nouvelle entité liée à l'entité application. Réalise aussi un écran d'importation des données.
+Un écran permet de charger les données d'un fichier Excel avec prévisualisation des données.
+Le fichier Excel a une feuille nommée "1-OCSIN Applications" qui a un tableau avec ces colonnes :
+- Application ID de l'EC
+- Application Nom
+- Application Statut
+- Application Date d'installation
+- Application Catégorie 1
+- Application Catégorie 2
+- Application Catégorie 3
+- Application Acronyme
+- Application Type d'application
+- Application Priorité en termes de disponibilité
+- Application Priorité en termes de confidentialité
+- Application Environnement poste de travail
+- Application Classification des informations
+- Application Informations supplémentaires
+- Application Dossier d'assistance
+- Application Priorité globale
+- Application Description EC
+- Application Type de moyen d'accès
+- Application Utilisateurs concernés
+Rajoute les colonnes de ce fichier comme des attributs de l'entité application dans une nouvelle entité liée à l'entité application.
+Lors de la visualisation, les code applications n'existant pas ne sont pas importés, seules les code application existants sont importés.
 
 ## Rapport application/cluster
 Cet écran propose un tableau qui liste toutes les applications et pour chaque cluster met une icone:
