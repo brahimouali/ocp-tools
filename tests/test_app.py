@@ -252,3 +252,46 @@ def test_report_rejects_invalid_cluster_filter(client, cluster_id):
         response = client.get('/reports/applications-clusters', query_string={'cluster_id': cluster_id, 'export': export})
         assert response.status_code == 400
         assert 'Cluster' in response.text
+
+
+def test_ocsin_import_updates_report_and_keeps_csv_codes_only(client):
+    seed(client)
+    preview = post(client, '/import', {
+        'cluster_id': '1', 'files': (io.BytesIO(b'namespace\napp-01234-dev\n'), 'namespaces.csv'),
+    })
+    token = re.search(r'name="preview" value="([^"]+)"', preview.text).group(1)
+    post(client, '/import', {'cluster_id': '1', 'preview': token, 'confirm': 'yes'})
+
+    assert b'Import OCSIN Applications' in client.get('/grafana/ocsin-applications').data
+    imported = post(client, '/grafana/ocsin-applications', {
+        'file': (io.BytesIO(
+            "Application ID de l'EC;Application Nom;C28\n01234;Mon <application>;Équipe\n"
+            "98765;Application hors cluster;\n".encode()
+        ), 'ocsin.csv'),
+    })
+    assert 'Import OCSIN terminé : 2' in imported.text
+    report = client.get('/reports/applications-clusters?cluster_id=1').text
+    assert 'Mon &lt;application&gt;' in report
+    assert 'Équipe' in report
+    assert 'app-01234-dev' in report
+    assert 'Application hors cluster' not in report
+    assert 'Application hors cluster' in client.get('/reports/applications-clusters').text
+    assert client.get('/reports/applications-clusters?cluster_id=1&export=csv').text.splitlines() == [
+        'code_app', '01234',
+    ]
+
+    post(client, '/grafana/ocsin-applications', {
+        'file': (io.BytesIO(b'[{"C2":"01234","C3":"Nom actualise"}]'), 'ocsin.json'),
+    })
+    report = client.get('/reports/applications-clusters?cluster_id=1').text
+    assert 'Nom actualise' in report
+    assert 'Mon &lt;application&gt;' not in report
+    assert 'app-01234-dev' in report
+
+
+def test_ocsin_import_rejects_invalid_file_atomically(client):
+    response = post(client, '/grafana/ocsin-applications', {
+        'file': (io.BytesIO(b'[{"C2":"12345","C3":"Valide"},{"C2":"invalide"}]'), 'ocsin.json'),
+    })
+    assert 'Import OCSIN impossible' in response.text
+    assert '12345' not in client.get('/reports/applications-clusters?export=csv').text

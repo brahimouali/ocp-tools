@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 import csv
 import io
+import json
 import os
 import re
 import sqlite3
@@ -12,10 +13,16 @@ from flask import Flask, flash, redirect, render_template, request, session, url
 import secrets
 from itsdangerous import URLSafeTimedSerializer, BadSignature
 
+from ocsin import ATTRIBUTES, parse_ocsin
+
 SCHEMA = '''
 CREATE TABLE IF NOT EXISTS environments(id INTEGER PRIMARY KEY, title TEXT NOT NULL UNIQUE, kind TEXT NOT NULL CHECK(kind IN ('Production','Recette','Développement')));
 CREATE TABLE IF NOT EXISTS clusters(id INTEGER PRIMARY KEY, title TEXT NOT NULL UNIQUE, console_url TEXT NOT NULL, api_url TEXT NOT NULL, environment_id INTEGER NOT NULL REFERENCES environments(id));
 CREATE TABLE IF NOT EXISTS applications(id INTEGER PRIMARY KEY, code TEXT NOT NULL UNIQUE);
+CREATE TABLE IF NOT EXISTS ocsin_applications(
+    application_id INTEGER PRIMARY KEY REFERENCES applications(id) ON DELETE CASCADE,
+    attributes TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS namespaces(id INTEGER PRIMARY KEY, title TEXT NOT NULL, environment TEXT NOT NULL DEFAULT 'DEV', cluster_id INTEGER NOT NULL REFERENCES clusters(id), application_id INTEGER REFERENCES applications(id), UNIQUE(cluster_id,title));
 CREATE TABLE IF NOT EXISTS pipelines(id INTEGER PRIMARY KEY, title TEXT NOT NULL, yaml TEXT NOT NULL, indexed INTEGER NOT NULL DEFAULT 0);
 '''
@@ -96,6 +103,31 @@ def create_app(config=None):
         template = {'/grafana': 'grafana.html', '/pipelines': 'pipelines.html'}.get(request.path, 'index.html')
         return render_template(template, environments=environments, clusters=clusters, namespaces=namespaces, pipelines=pipelines)
 
+    @app.route('/grafana/ocsin-applications', methods=['GET', 'POST'])
+    def ocsin_import():
+        if request.method == 'GET':
+            return render_template('ocsin_import.html')
+        upload = request.files.get('file')
+        if not upload or not upload.filename:
+            flash('Sélectionnez un fichier de données OCSIN Applications.', 'error')
+            return redirect(url_for('ocsin_import'))
+        try:
+            applications = parse_ocsin(upload.read())
+        except (ValueError, csv.Error, RecursionError) as exc:
+            flash(f'Import OCSIN impossible : {exc}', 'error')
+            return redirect(url_for('ocsin_import'))
+
+        with db() as conn:
+            conn.executemany('INSERT INTO applications(code) VALUES (?) ON CONFLICT(code) DO NOTHING',
+                             ((code,) for code in applications))
+            conn.executemany(
+                'INSERT INTO ocsin_applications(application_id, attributes) '
+                'SELECT id, ? FROM applications WHERE code = ? '
+                'ON CONFLICT(application_id) DO UPDATE SET attributes = excluded.attributes',
+                ((json.dumps(attributes, ensure_ascii=False), code) for code, attributes in applications.items()))
+        flash(f'Import OCSIN terminé : {len(applications)} application(s).', 'success')
+        return redirect(url_for('ocsin_import'))
+
     @app.get('/reports/applications-clusters')
     def application_cluster_report():
         exclude_unknown = request.args.get('exclude_unknown') == '1'
@@ -111,7 +143,8 @@ def create_app(config=None):
             if selected_cluster is not None and not any(c['id'] == selected_cluster for c in clusters):
                 return 'Cluster inconnu.', 400
             applications = conn.execute(
-                "SELECT a.id,a.code FROM applications a "
+                "SELECT a.id,a.code,o.attributes FROM applications a "
+                "LEFT JOIN ocsin_applications o ON o.application_id=a.id "
                 "WHERE (? = 0 OR a.code = '' OR ltrim(a.code, '0') != '') "
                 'AND (? IS NULL OR EXISTS (SELECT 1 FROM namespaces n '
                 'WHERE n.application_id=a.id AND n.cluster_id=?)) ORDER BY a.code',
@@ -130,9 +163,11 @@ def create_app(config=None):
         presence = {}
         for namespace in namespaces:
             presence.setdefault((namespace['application_id'], namespace['cluster_id']), []).append(namespace['title'])
+        ocsin_by_application = {a['id']: json.loads(a['attributes']) for a in applications if a['attributes'] is not None}
         return render_template('application_cluster_report.html', applications=applications,
                                clusters=clusters, presence=presence, exclude_unknown=exclude_unknown,
-                               selected_cluster=selected_cluster)
+                               selected_cluster=selected_cluster, ocsin_columns=ATTRIBUTES,
+                               ocsin_by_application=ocsin_by_application)
 
     def required(name):
         value = request.form.get(name, '').strip()

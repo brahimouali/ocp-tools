@@ -20,7 +20,7 @@
   {% if not clusters %}<p>Aucun cluster. Créez un cluster dans la gestion des environnements.</p>{% endif %}
   <table class="application-report">
     <caption>Présence des applications dans les clusters OpenShift</caption>
-    <thead><tr><th scope="col">Code application</th>{% for c in clusters %}<th scope="col">{{ c.title }}<br><small>{{ c.environment_title }}</small></th>{% endfor %}</tr></thead>
+    <thead><tr><th scope="col">Code application</th>{% for c in clusters %}<th scope="col">{{ c.title }}<br><small>{{ c.environment_title }}</small></th>{% endfor %}{% for label in ocsin_columns.values() %}<th scope="col">{{ label }}</th>{% endfor %}</tr></thead>
     <tbody>
     {% for a in applications %}<tr data-application="{{ a.code }}"><th scope="row">{{ a.code }}</th>
       {% for c in clusters %}{% set names = presence.get((a.id,c.id), []) %}<td>
@@ -29,7 +29,9 @@
         <div id="namespaces-{{ a.id }}-{{ c.id }}" class="namespace-popup" popover="manual" role="tooltip"><strong>Namespaces — {{ a.code }} / {{ c.title }}</strong><ul>{% for name in names %}<li>{{ name }}</li>{% endfor %}</ul></div>
         {% else %}<span class="presence-status absent" role="img" aria-label="Application {{ a.code }} absente de {{ c.title }}">✕</span>{% endif %}
       </td>{% endfor %}
-    </tr>{% else %}<tr><td colspan="{{ clusters|length + 1 }}">Aucune application{% if exclude_unknown or selected_cluster is not none %} correspondant au filtre{% endif %}.</td></tr>{% endfor %}
+      {% set attributes = ocsin_by_application.get(a.id, {}) %}
+      {% for column in ocsin_columns %}{% set value = attributes.get(column) %}<td>{{ value if value is not none else '' }}</td>{% endfor %}
+    </tr>{% else %}<tr><td colspan="{{ clusters|length + ocsin_columns|length + 1 }}">Aucune application{% if exclude_unknown or selected_cluster is not none %} correspondant au filtre{% endif %}.</td></tr>{% endfor %}
     </tbody>
   </table>
 </section>

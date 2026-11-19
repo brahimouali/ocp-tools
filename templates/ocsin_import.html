@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <h2>Import OCSIN Applications</h2>
+  <p>Importez les données du rapport Grafana au format CSV ou sous forme de liste d’objets JSON. La colonne « Application ID de l’EC » (C2) relie chaque ligne au code application. Conservez les zéros initiaux dans les codes JSON en les écrivant entre guillemets.</p>
+  <form method="post" enctype="multipart/form-data">
+    {{ csrf() }}
+    <label>Fichier du rapport <input type="file" name="file" accept=".csv,.json,text/csv,application/json" required></label>
+    <button>Importer</button>
+  </form>
+</section>
+{% endblock %}

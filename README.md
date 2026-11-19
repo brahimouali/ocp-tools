@@ -38,6 +38,7 @@ Les écrans utilisent toute la largeur disponible de la page.
 
 - `/` : gestion des environnements et des clusters, liste des namespaces.
 - `/grafana` : cadres adaptatifs par environnement et cluster ; sélectionner un CSV remplace immédiatement l’aperçu du cluster. La confirmation enregistre les données. Sans JavaScript, le bouton Prévisualiser reste utilisable.
+- `/grafana/ocsin-applications` : import des attributs du rapport Grafana OCSIN Applications.
 - `/pipelines` : création et réindexation des pipelines GoCD.
 - `/reports/applications-clusters` : présence de chaque application par cluster, namespaces au survol, au focus clavier ou au toucher ; filtre par cluster pour retenir les applications ayant un namespace dans le cluster choisi, tout en conservant les colonnes de comparaison ; filtre pour exclure tous les codes composés uniquement de zéros ; export CSV des applications affichées avec une seule colonne `code_app` (zéros initiaux conservés dans le fichier).
 
@@ -66,6 +67,20 @@ namespace,pods
 app-12345-dev,3
 app-6789-dev,2
 ```
+
+## Import OCSIN Applications
+
+Depuis l’écran dédié, importez un CSV exporté de Grafana ou un JSON contenant une
+liste d’objets. Les clés peuvent être les libellés affichés dans Grafana ou les
+alias `C1` à `C28` de la configuration du panneau. La colonne
+`Application ID de l'EC` (`C2`) est obligatoire et contient le code application
+sur 4 à 6 chiffres. Dans un JSON, gardez les codes avec zéros initiaux sous
+forme de chaînes, par exemple `[{"C2":"01234","C3":"Application exemple"}]`.
+
+Le fichier `prompt-extras/ocsin-applications-anonymized.json` décrit les colonnes
+du panneau et ne contient aucune ligne d’application. L’import crée les
+applications manquantes et remplace les attributs OCSIN des codes présents
+dans le fichier. Les attributs apparaissent dans le rapport application/cluster.
 
 ## Vérifications
 
