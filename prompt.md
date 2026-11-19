@@ -74,6 +74,7 @@ Le fichier Excel a une feuille nommée "1-OCSIN Applications" qui a un tableau a
 - Application Utilisateurs concernés
 Rajoute les colonnes de ce fichier comme des attributs de l'entité application dans une nouvelle entité liée à l'entité application.
 Lors de la visualisation, les code applications n'existant pas ne sont pas importés, seules les code application existants sont importés.
+Les code application non traitables ne bloquent pas l'import mais sont répertoriés à part comme non traitables.
 
 ## Rapport application/cluster
 Cet écran propose un tableau qui liste toutes les applications et pour chaque cluster met une icone:
