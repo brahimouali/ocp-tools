@@ -51,7 +51,7 @@ A chaque fois qu'un fichier CSV est choisi,
   - si le code application n'est pas reconnu, alors le code 00000 est utilisé
 
 ## Import du rapport grafana "OCSIN Applications"
-A partir du fichier d'exemple de données : prompt-extras/ocsin-applications.json, rajoute les colonnes de ce fichier comme des attributs d'une application dans une nouvelle entité liée à l'entité application. Réalise aussi un écran d'importation des données.
+A partir du fichier d'exemple de données : prompt-extras/ocsin-applications-anonymized.json, rajoute les colonnes de ce fichier comme des attributs d'une application dans une nouvelle entité liée à l'entité application. Réalise aussi un écran d'importation des données.
 
 ## Rapport application/cluster
 Cet écran propose un tableau qui liste toutes les applications et pour chaque cluster met une icone:
