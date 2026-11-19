@@ -140,7 +140,7 @@ def create_app(config=None):
             flash('Sélectionnez un fichier de données OCSIN Applications.', 'error')
             return redirect(url_for('ocsin_import'))
         try:
-            applications = parse_ocsin(upload.read(), excel=upload.filename.lower().endswith('.xlsx'))
+            applications, rejected = parse_ocsin(upload.read(), excel=upload.filename.lower().endswith('.xlsx'))
         except (ValueError, csv.Error, RecursionError) as exc:
             flash(f'Import OCSIN impossible : {exc}', 'error')
             return redirect(url_for('ocsin_import'))
@@ -157,7 +157,7 @@ def create_app(config=None):
         columns = {key: label for key, label in ATTRIBUTES.items()
                    if any(key in attributes for attributes in applications.values())}
         return render_template('ocsin_import.html', applications=applications, eligible=eligible,
-                               columns=columns, preview_token=token)
+                               columns=columns, preview_token=token, rejected=rejected)
 
     @app.get('/reports/applications-clusters')
     def application_cluster_report():

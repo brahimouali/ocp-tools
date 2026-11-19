@@ -18,6 +18,7 @@
       <button>Confirmer l’import</button>
     </form>
     {% endif %}
+    {% if applications %}
     <table>
       <thead><tr><th scope="col">Code application</th><th scope="col">Import</th>{% for label in columns.values() %}<th scope="col">{{ label }}</th>{% endfor %}</tr></thead>
       <tbody>
@@ -27,6 +28,18 @@
       {% endfor %}
       </tbody>
     </table>
+    {% endif %}
+    {% if rejected %}
+    <h3>Codes non traitables ({{ rejected|length }})</h3>
+    <table>
+      <thead><tr><th scope="col">Entrée</th><th scope="col">Code fourni</th><th scope="col">Motif</th></tr></thead>
+      <tbody>
+      {% for number, code, reason in rejected %}
+        <tr><th scope="row">{{ number }}</th><td>{{ code if code is not none else '' }}</td><td>{{ reason }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
   {% endif %}
 </section>
 {% endblock %}

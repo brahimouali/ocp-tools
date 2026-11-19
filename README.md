@@ -74,7 +74,9 @@ Depuis l’écran dédié, chargez un fichier Excel `.xlsx` contenant la feuille
 `1-OCSIN Applications` et les colonnes du rapport. La colonne
 `Application ID de l'EC` sert à retrouver le code application, y compris ses
 zéros initiaux. L’aperçu affiche les valeurs lues, les applications à importer
-et les codes inconnus ignorés. Confirmez l’import pour enregistrer les attributs
+et les codes inconnus ignorés. Les codes manquants, invalides ou en double
+sont listés à part. Pour un doublon, la première entrée est conservée.
+Confirmez l’import pour enregistrer les attributs
 des applications existantes dans le rapport application/cluster.
 
 Les formats CSV et JSON précédemment pris en charge restent disponibles avec

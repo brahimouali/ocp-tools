@@ -177,6 +177,7 @@ def text_records(raw):
 
 def collect_applications(records):
     applications = {}
+    rejected = []
     for number, row in enumerate(records, 1):
         if number > 10000:
             raise ValueError('Maximum 10 000 lignes par fichier.')
@@ -189,19 +190,23 @@ def collect_applications(records):
                 continue
             if key in values:
                 raise ValueError(f'Entrée {number} : colonne « {COLUMNS[key]} » en double.')
-            if value is not None and not isinstance(value, (str, int, float, bool)):
+            if key != CODE_COLUMN and value is not None and not isinstance(value, (str, int, float, bool)):
                 raise ValueError(f'Entrée {number} : valeur invalide pour « {COLUMNS[key]} ».')
             values[key] = value
         code = values.pop(CODE_COLUMN, None)
         if type(code) is int:
             code = str(code)
-        if not isinstance(code, str) or not re.fullmatch(r'(?:[0-9]{4,6}|APP-[0-9]{3,6})', code.strip()):
-            raise ValueError(f'Entrée {number} : « {COLUMNS[CODE_COLUMN]} » doit contenir un code de 4 à 6 chiffres ou un identifiant APP- suivi de 3 à 6 chiffres.')
-        code = code.strip()
+        normalized = code.strip() if isinstance(code, str) else None
+        if not normalized or not re.fullmatch(r'(?:[0-9]{4,6}|APP-[0-9]{3,6})', normalized):
+            reason = 'Code manquant' if code is None or normalized == '' else 'Format de code invalide'
+            rejected.append((number, code, reason))
+            continue
+        code = normalized
         if code in applications:
-            raise ValueError(f'Entrée {number} : code application {code} en double.')
+            rejected.append((number, code, 'Code en double'))
+            continue
         applications[code] = values
 
-    if not applications:
+    if not applications and not rejected:
         raise ValueError('Le fichier ne contient aucune application.')
-    return applications
+    return applications, rejected

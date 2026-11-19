@@ -260,7 +260,7 @@ def test_report_rejects_invalid_cluster_filter(client, cluster_id):
         assert 'Cluster' in response.text
 
 
-def ocsin_workbook(sheet_name=EXCEL_SHEET):
+def ocsin_workbook(sheet_name=EXCEL_SHEET, extra_rows=()):
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = sheet_name
@@ -271,6 +271,8 @@ def ocsin_workbook(sheet_name=EXCEL_SHEET):
     sheet.append([values.get(key) for key in columns])
     sheet['B3'].number_format = '00000'
     sheet.append(['Application inconnue', '98765'])
+    for row in extra_rows:
+        sheet.append(row)
     output = io.BytesIO()
     workbook.save(output)
     workbook.close()
@@ -288,7 +290,15 @@ def test_ocsin_excel_preview_imports_only_existing_applications(client):
 
     path = '/grafana/ocsin-applications'
     report_path = '/reports/applications-clusters'
-    response = post(client, path, {'file': (ocsin_workbook(), 'ocsin.xlsx')})
+    workbook = ocsin_workbook(extra_rows=[
+        ('Code invalide', '<hors-format>'), ('Sans code', None), ('Doublon', '01234'),
+    ])
+    response = post(client, path, {'file': (workbook, 'ocsin.xlsx')})
+    assert 'Codes non traitables (3)' in response.text
+    assert '&lt;hors-format&gt;' in response.text
+    assert 'Format de code invalide' in response.text
+    assert 'Code manquant' in response.text
+    assert 'Code en double' in response.text
     assert '1 application(s) à importer · 1 ignorée(s)' in response.text
     assert 'Application inconnue' in response.text
     assert 'Mon &lt;application&gt;' in response.text
@@ -299,6 +309,7 @@ def test_ocsin_excel_preview_imports_only_existing_applications(client):
     assert 'Import OCSIN terminé : 1' in response.text
     report = client.get(report_path + '?cluster_id=1').text
     assert 'Mon &lt;application&gt;' in report
+    assert 'Doublon' not in report
     assert '2024-01-15' in report
     assert 'app-01234-dev' in report
     assert 'Application inconnue' not in client.get(report_path).text
