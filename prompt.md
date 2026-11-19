@@ -82,6 +82,12 @@ Cet écran propose un tableau qui liste toutes les applications et pour chaque c
 - une icone absence rouge indique que l'application n'a pas de namespace dans ce cluster
 Un filtre permet d'exclure les applications dont le code ne contient que des 0.
 Un filtre par cluster permet de filtrer les applications par cluster.
+
+### Export CSV 1
 Un bouton d'export permet de générer un fichier csv avec 1 seule colonne :
 - code_app et en valeur les codes applications affichés (filtrés)
 Le tableau affiche les attributs issues de l'entité issue de l'import "OCSIN Applications".
+
+### Export XLSX 1
+Un bouton d'export permet de générer un fichier xlsx avec les données filtrées.
+Un tableau dans excel sur ces données est créé.
