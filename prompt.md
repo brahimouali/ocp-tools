@@ -50,6 +50,9 @@ A chaque fois qu'un fichier CSV est choisi,
   - le code application du namespace contenu dans le nom (code entre 4 et 6 chiffres représentant le code application de l'application)
   - si le code application n'est pas reconnu, alors le code 00000 est utilisé
 
+## Import du rapport grafana "OCSIN Applications"
+A partir du fichier d'exemple de données : prompt-extras/ocsin-applications.json, rajoute les colonnes de ce fichier comme des attributs d'une application dans une nouvelle entité liée à l'entité application. Réalise aussi un écran d'importation des données.
+
 ## Rapport application/cluster
 Cet écran propose un tableau qui liste toutes les applications et pour chaque cluster met une icone:
 - une icone validation verte indique que l'application a un namespace dans ce cluster et au survol de l'icone, une liste des namespaces apparaît en popup
@@ -58,3 +61,4 @@ Un filtre permet d'exclure les applications dont le code ne contient que des 0.
 Un filtre par cluster permet de filtrer les applications par cluster.
 Un bouton d'export permet de générer un fichier csv avec 1 seule colonne :
 - code_app et en valeur les codes applications affichés (filtrés)
+Le tableau affiche les attributs issues de l'entité issue de l'import "OCSIN Applications".
