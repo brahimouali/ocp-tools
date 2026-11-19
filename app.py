@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sqlite3
+from time import time
 from pathlib import Path
 
 import requests
@@ -22,6 +23,12 @@ CREATE TABLE IF NOT EXISTS applications(id INTEGER PRIMARY KEY, code TEXT NOT NU
 CREATE TABLE IF NOT EXISTS ocsin_applications(
     application_id INTEGER PRIMARY KEY REFERENCES applications(id) ON DELETE CASCADE,
     attributes TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS ocsin_previews(
+    token TEXT PRIMARY KEY,
+    owner TEXT NOT NULL UNIQUE,
+    expires INTEGER NOT NULL,
+    applications TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS namespaces(id INTEGER PRIMARY KEY, title TEXT NOT NULL, environment TEXT NOT NULL DEFAULT 'DEV', cluster_id INTEGER NOT NULL REFERENCES clusters(id), application_id INTEGER REFERENCES applications(id), UNIQUE(cluster_id,title));
 CREATE TABLE IF NOT EXISTS pipelines(id INTEGER PRIMARY KEY, title TEXT NOT NULL, yaml TEXT NOT NULL, indexed INTEGER NOT NULL DEFAULT 0);
@@ -107,26 +114,50 @@ def create_app(config=None):
     def ocsin_import():
         if request.method == 'GET':
             return render_template('ocsin_import.html')
+        owner = session['csrf']
+        now = int(time())
+        token = request.form.get('ocsin_preview')
+        if token:
+            with db() as conn:
+                preview = conn.execute(
+                    'DELETE FROM ocsin_previews WHERE token=? AND owner=? AND expires>? RETURNING applications',
+                    (token, owner, now)).fetchone()
+                if preview is None:
+                    flash('Aperçu OCSIN indisponible. Sélectionnez à nouveau le fichier.', 'error')
+                    return redirect(url_for('ocsin_import'))
+                applications = json.loads(preview['applications'])
+                updated = conn.executemany(
+                    'INSERT INTO ocsin_applications(application_id, attributes) '
+                    'SELECT id, ? FROM applications WHERE code = ? '
+                    'ON CONFLICT(application_id) DO UPDATE SET attributes = excluded.attributes',
+                    ((json.dumps(attributes, ensure_ascii=False), code) for code, attributes in applications.items()))
+                count = updated.rowcount
+            flash(f'Import OCSIN terminé : {count} application(s).', 'success')
+            return redirect(url_for('ocsin_import'))
+
         upload = request.files.get('file')
         if not upload or not upload.filename:
             flash('Sélectionnez un fichier de données OCSIN Applications.', 'error')
             return redirect(url_for('ocsin_import'))
         try:
-            applications = parse_ocsin(upload.read())
+            applications = parse_ocsin(upload.read(), excel=upload.filename.lower().endswith('.xlsx'))
         except (ValueError, csv.Error, RecursionError) as exc:
             flash(f'Import OCSIN impossible : {exc}', 'error')
             return redirect(url_for('ocsin_import'))
 
         with db() as conn:
-            conn.executemany('INSERT INTO applications(code) VALUES (?) ON CONFLICT(code) DO NOTHING',
-                             ((code,) for code in applications))
-            conn.executemany(
-                'INSERT INTO ocsin_applications(application_id, attributes) '
-                'SELECT id, ? FROM applications WHERE code = ? '
-                'ON CONFLICT(application_id) DO UPDATE SET attributes = excluded.attributes',
-                ((json.dumps(attributes, ensure_ascii=False), code) for code, attributes in applications.items()))
-        flash(f'Import OCSIN terminé : {len(applications)} application(s).', 'success')
-        return redirect(url_for('ocsin_import'))
+            existing_codes = {row['code'] for row in conn.execute('SELECT code FROM applications')}
+            eligible = {code: attributes for code, attributes in applications.items() if code in existing_codes}
+            conn.execute('DELETE FROM ocsin_previews WHERE owner=? OR expires<=?', (owner, now))
+            token = None
+            if eligible:
+                token = secrets.token_urlsafe(32)
+                conn.execute('INSERT INTO ocsin_previews VALUES (?, ?, ?, ?)',
+                             (token, owner, now + 1800, json.dumps(eligible, ensure_ascii=False)))
+        columns = {key: label for key, label in ATTRIBUTES.items()
+                   if any(key in attributes for attributes in applications.values())}
+        return render_template('ocsin_import.html', applications=applications, eligible=eligible,
+                               columns=columns, preview_token=token)
 
     @app.get('/reports/applications-clusters')
     def application_cluster_report():

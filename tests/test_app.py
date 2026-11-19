@@ -1,14 +1,17 @@
 import io
 import json
 import re
-from pathlib import Path
+from datetime import datetime
 import sqlite3
 from unittest.mock import Mock
 
 import pytest
 import requests
-from pathlib import Path
+from datetime import datetime
+from openpyxl import Workbook
+
 from app import create_app, parse_csv
+from ocsin import COLUMNS, EXCEL_COLUMNS, EXCEL_SHEET
 
 
 @pytest.fixture
@@ -257,7 +260,25 @@ def test_report_rejects_invalid_cluster_filter(client, cluster_id):
         assert 'Cluster' in response.text
 
 
-def test_ocsin_import_updates_report_and_keeps_csv_codes_only(client):
+def ocsin_workbook(sheet_name=EXCEL_SHEET):
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = sheet_name
+    sheet.append(['Export Grafana'])
+    columns = ('C3', 'C2', *(key for key in EXCEL_COLUMNS if key not in ('C2', 'C3')))
+    sheet.append([COLUMNS[key] for key in columns])
+    values = {'C2': 1234, 'C3': 'Mon <application>', 'C5': datetime(2024, 1, 15), 'C28': 0}
+    sheet.append([values.get(key) for key in columns])
+    sheet['B3'].number_format = '00000'
+    sheet.append(['Application inconnue', '98765'])
+    output = io.BytesIO()
+    workbook.save(output)
+    workbook.close()
+    output.seek(0)
+    return output
+
+
+def test_ocsin_excel_preview_imports_only_existing_applications(client):
     seed(client)
     preview = post(client, '/import', {
         'cluster_id': '1', 'files': (io.BytesIO(b'namespace\napp-01234-dev\n'), 'namespaces.csv'),
@@ -265,61 +286,56 @@ def test_ocsin_import_updates_report_and_keeps_csv_codes_only(client):
     token = re.search(r'name="preview" value="([^"]+)"', preview.text).group(1)
     post(client, '/import', {'cluster_id': '1', 'preview': token, 'confirm': 'yes'})
 
-    assert b'Import OCSIN Applications' in client.get('/grafana/ocsin-applications').data
-    imported = post(client, '/grafana/ocsin-applications', {
-        'file': (io.BytesIO(
-            "Application ID de l'EC;Application Nom;C28\n01234;Mon <application>;Équipe\n"
-            "98765;Application hors cluster;\n".encode()
-        ), 'ocsin.csv'),
-    })
-    assert 'Import OCSIN terminé : 2' in imported.text
-    report = client.get('/reports/applications-clusters?cluster_id=1').text
+    path = '/grafana/ocsin-applications'
+    report_path = '/reports/applications-clusters'
+    response = post(client, path, {'file': (ocsin_workbook(), 'ocsin.xlsx')})
+    assert '1 application(s) à importer · 1 ignorée(s)' in response.text
+    assert 'Application inconnue' in response.text
+    assert 'Mon &lt;application&gt;' in response.text
+    assert 'Mon &lt;application&gt;' not in client.get(report_path).text
+
+    token = re.search(r'name="ocsin_preview" value="([^"]+)"', response.text).group(1)
+    response = post(client, path, {'ocsin_preview': token})
+    assert 'Import OCSIN terminé : 1' in response.text
+    report = client.get(report_path + '?cluster_id=1').text
     assert 'Mon &lt;application&gt;' in report
-    assert 'Équipe' in report
+    assert '2024-01-15' in report
     assert 'app-01234-dev' in report
-    assert 'Application hors cluster' not in report
-    assert 'Application hors cluster' in client.get('/reports/applications-clusters').text
-    assert client.get('/reports/applications-clusters?cluster_id=1&export=csv').text.splitlines() == [
-        'code_app', '01234',
-    ]
-
-    post(client, '/grafana/ocsin-applications', {
-        'file': (io.BytesIO(b'[{"C2":"01234","C3":"Nom actualise"}]'), 'ocsin.json'),
-    })
-    report = client.get('/reports/applications-clusters?cluster_id=1').text
-    assert 'Nom actualise' in report
-    assert 'Mon &lt;application&gt;' not in report
-    assert 'app-01234-dev' in report
+    assert 'Application inconnue' not in client.get(report_path).text
+    assert client.get(report_path + '?export=csv').text.splitlines() == ['code_app', '01234']
+    assert 'Aperçu OCSIN indisponible' in post(client, path, {'ocsin_preview': token}).text
 
 
-def test_ocsin_import_rejects_invalid_file_atomically(client):
+def test_ocsin_excel_requires_named_sheet(client):
     response = post(client, '/grafana/ocsin-applications', {
-        'file': (io.BytesIO(b'[{"C2":"12345","C3":"Valide"},{"C2":"invalide"}]'), 'ocsin.json'),
+        'file': (ocsin_workbook('Autre feuille'), 'ocsin.xlsx'),
     })
-    assert 'Import OCSIN impossible' in response.text
-    assert '12345' not in client.get('/reports/applications-clusters?export=csv').text
+    assert 'La feuille « 1-OCSIN Applications » est obligatoire.' in response.text
+    assert 'Confirmer l’import' not in response.text
 
 
-def test_ocsin_import_accepts_supplied_grafana_panel(client):
-    sample = Path(__file__).resolve().parents[1] / 'prompt-extras' / 'ocsin-applications-anonymized.json'
-    with sample.open('rb') as upload:
-        response = post(client, '/grafana/ocsin-applications', {'file': (upload, sample.name)})
-    assert 'Import OCSIN terminé : 10' in response.text
-    report = client.get('/reports/applications-clusters').text
-    assert 'data-application="APP-001"' in report
-    assert 'SAP ERP' in report
-    assert 'Lotus Notes' in report
-    assert client.get('/reports/applications-clusters?export=csv').text.splitlines() == [
-        'code_app', *(f'APP-{i:03}' for i in range(1, 11)),
-    ]
-
-
-def test_ocsin_panel_import_rejects_non_literal_query(client):
-    sample = Path(__file__).resolve().parents[1] / 'prompt-extras' / 'ocsin-applications-anonymized.json'
-    panel = json.loads(sample.read_bytes())
-    panel['targets'][0]['sourceQuery']['rawQuery'] += '; SELECT 1'
+def test_ocsin_excel_without_matching_codes_cannot_be_confirmed(client):
     response = post(client, '/grafana/ocsin-applications', {
-        'file': (io.BytesIO(json.dumps(panel).encode()), sample.name),
+        'file': (ocsin_workbook(), 'ocsin.xlsx'),
     })
-    assert 'Import OCSIN impossible' in response.text
+    assert '0 application(s) à importer · 2 ignorée(s)' in response.text
+    assert 'Confirmer l’import' not in response.text
     assert client.get('/reports/applications-clusters?export=csv').text.splitlines() == ['code_app']
+
+
+def test_ocsin_panel_preview_preserves_existing_applications(client):
+    with sqlite3.connect(client.application.config['DATABASE']) as db:
+        db.execute('INSERT INTO applications(code) VALUES (?)', ('APP-001',))
+    fields = dict.fromkeys(COLUMNS, '')
+    fields.update(C2='APP-001', C3="L'application")
+    literals = ', '.join("'" + value.replace("'", "''") + "'" for value in fields.values())
+    panel = {'targets': [{'sourceQuery': {'rawQuery': 'SELECT ' + literals}}]}
+    path = '/grafana/ocsin-applications'
+    response = post(client, path, {'file': (io.BytesIO(json.dumps(panel).encode()), 'panel.json')})
+    assert '1 application(s) à importer' in response.text
+    token = re.search(r'name="ocsin_preview" value="([^"]+)"', response.text).group(1)
+    assert 'Import OCSIN terminé : 1' in post(client, path, {'ocsin_preview': token}).text
+
+    panel['targets'][0]['sourceQuery']['rawQuery'] += '; SELECT 1'
+    response = post(client, path, {'file': (io.BytesIO(json.dumps(panel).encode()), 'panel.json')})
+    assert 'Import OCSIN impossible' in response.text

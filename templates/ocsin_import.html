@@ -2,11 +2,31 @@
 {% block content %}
 <section>
   <h2>Import OCSIN Applications</h2>
-  <p>Importez les données du rapport Grafana au format CSV, sous forme de liste d’objets JSON ou à partir du panneau Grafana JSON contenant les lignes du rapport. La colonne « Application ID de l’EC » (C2) relie chaque ligne au code application. Conservez les zéros initiaux dans les codes JSON en les écrivant entre guillemets.</p>
+  <p>Chargez un classeur Excel (.xlsx) contenant la feuille « 1-OCSIN Applications ». La colonne « Application ID de l’EC » sert à retrouver chaque application existante.</p>
   <form method="post" enctype="multipart/form-data">
     {{ csrf() }}
-    <label>Fichier du rapport <input type="file" name="file" accept=".csv,.json,text/csv,application/json" required></label>
-    <button>Importer</button>
+    <label>Fichier du rapport <input type="file" name="file" accept=".xlsx,.csv,.json" required></label>
+    <button>Prévisualiser</button>
   </form>
+  {% if applications is defined %}
+    <h3>Aperçu de l’import</h3>
+    <p>{{ eligible|length }} application(s) à importer · {{ applications|length - eligible|length }} ignorée(s)</p>
+    {% if preview_token %}
+    <form method="post">
+      {{ csrf() }}
+      <input type="hidden" name="ocsin_preview" value="{{ preview_token }}">
+      <button>Confirmer l’import</button>
+    </form>
+    {% endif %}
+    <table>
+      <thead><tr><th scope="col">Code application</th><th scope="col">Import</th>{% for label in columns.values() %}<th scope="col">{{ label }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for code, attributes in applications.items() %}
+        <tr><th scope="row">{{ code }}</th><td>{{ 'À importer' if code in eligible else 'Ignorée : code inconnu' }}</td>
+        {% for column in columns %}{% set value = attributes.get(column) %}<td>{{ value if value is not none else '' }}</td>{% endfor %}</tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
 </section>
 {% endblock %}

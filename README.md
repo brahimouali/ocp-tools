@@ -70,20 +70,15 @@ app-6789-dev,2
 
 ## Import OCSIN Applications
 
-Depuis l’écran dédié, importez un CSV exporté de Grafana ou un JSON contenant une
-liste d’objets. Les clés peuvent être les libellés affichés dans Grafana ou les
-alias `C1` à `C28` de la configuration du panneau. La colonne
-`Application ID de l'EC` (`C2`) est obligatoire et contient le code application
-sur 4 à 6 chiffres. Dans un JSON, gardez les codes avec zéros initiaux sous
-forme de chaînes, par exemple `[{"C2":"01234","C3":"Application exemple"}]`.
+Depuis l’écran dédié, chargez un fichier Excel `.xlsx` contenant la feuille
+`1-OCSIN Applications` et les colonnes du rapport. La colonne
+`Application ID de l'EC` sert à retrouver le code application, y compris ses
+zéros initiaux. L’aperçu affiche les valeurs lues, les applications à importer
+et les codes inconnus ignorés. Confirmez l’import pour enregistrer les attributs
+des applications existantes dans le rapport application/cluster.
 
-Vous pouvez aussi importer directement le panneau Grafana
-`prompt-extras/ocsin-applications-anonymized.json`. L’import lit les valeurs
-texte des lignes `SELECT … UNION ALL` présentes dans le fichier, sans exécuter
-la requête. Les identifiants anonymisés comme `APP-001` sont conservés tels quels.
-L’import crée les applications manquantes et remplace les attributs OCSIN des
-codes présents dans le fichier. Ces attributs apparaissent dans le rapport
-application/cluster.
+Les formats CSV et JSON précédemment pris en charge restent disponibles avec
+le même aperçu et la même règle de correspondance des codes.
 
 ## Vérifications
 
